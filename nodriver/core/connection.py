@@ -275,31 +275,44 @@ class Connection(metaclass=CantTouchThis):
 
     async def aopen(self, **kw):
         """
-        opens the websocket connection. should not be called manually by users
+        Opens the WebSocket connection with retry logic.
         :param kw:
         :return:
         """
-
-        if not self.websocket or self.websocket.closed:
-            try:
-                self.websocket = await websockets.connect(
-                    self.websocket_url,
-                    ping_timeout=PING_TIMEOUT,
-                    max_size=MAX_SIZE,
-                )
-                self.listener = Listener(self)
-            except (Exception,) as e:
-                logger.debug("exception during opening of websocket : %s", e)
-                if self.listener:
-                    self.listener.cancel()
-                raise
+        import time
+    
+        max_retries = 3  # Number of retry attempts
+        delay = 2  # Time to wait between retries
+    
+        for attempt in range(max_retries):
+            if not self.websocket or self.websocket.closed:
+                try:
+                    print(f"[DEBUG] Attempting to connect to WebSocket (Attempt {attempt + 1})...")
+                    self.websocket = await websockets.connect(
+                        self.websocket_url,
+                        ping_timeout=PING_TIMEOUT,
+                        max_size=MAX_SIZE,
+                    )
+                    self.listener = Listener(self)
+                    print(f"[DEBUG] WebSocket connection successful on attempt {attempt + 1}.")
+                    break  # Exit the loop if connection is successful
+                except (Exception,) as e:
+                    logger.debug("Exception during opening of WebSocket: %s", e)
+                    print(f"[ERROR] WebSocket connection attempt {attempt + 1} failed: {e}")
+                    if attempt < max_retries - 1:
+                        print(f"[DEBUG] Retrying in {delay} seconds...")
+                        time.sleep(delay)  # Wait before retrying
+                    else:
+                        print(f"[ERROR] All {max_retries} attempts to connect to WebSocket failed.")
+                        if self.listener:
+                            self.listener.cancel()
+                        raise e  # Raise exception if all retries fail
+    
         if not self.listener or not self.listener.running:
             self.listener = Listener(self)
-            logger.debug("\n✅  opened websocket connection to %s", self.websocket_url)
-
-        # when a websocket connection is closed (either by error or on purpose)
-        # and reconnected, the registered event listeners (if any), should be
-        # registered again, so the browser sends those events
+            logger.debug("\n✅  Opened WebSocket connection to %s", self.websocket_url)
+    
+        # Register event listeners again after reconnecting
         await self._register_handlers()
 
     async def aclose(self):
