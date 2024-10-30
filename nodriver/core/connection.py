@@ -281,12 +281,14 @@ class Connection(metaclass=CantTouchThis):
         """
         import time
     
-        max_retries = 3  # Number of retry attempts
-        delay = 2  # Time to wait between retries
+        max_retries = 5  # Number of retry attempts
+        delay = 5  # Time to wait between retries
     
         for attempt in range(max_retries):
             if not self.websocket or self.websocket.closed:
                 try:
+                    print(f"[DEBUG] Waiting before attempting to connect to WebSocket...")
+                    time.sleep(1)
                     print(f"[DEBUG] Attempting to connect to WebSocket (Attempt {attempt + 1})...")
                     self.websocket = await websockets.connect(
                         self.websocket_url,
